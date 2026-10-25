@@ -115,4 +115,4 @@ cargo run --example basic
 
 ## 许可证
 
-原创代码采用 [MIT](LICENSE)。改编的 Android 惯性与 Chromium 速度算法保留 Apache-2.0 和 BSD-3-Clause 声明，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+原创代码采用 `MIT OR Apache-2.0` 双许可证，你可以选择 [MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE)。改编的 Android 惯性与 Chromium 速度算法保留 Apache-2.0 和 BSD-3-Clause 声明，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

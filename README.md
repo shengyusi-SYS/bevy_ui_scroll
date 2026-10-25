@@ -155,6 +155,8 @@ Build setup, tests and the source map are in the [developer guide](docs/developm
 
 ## License
 
-Original code: [MIT](LICENSE). The adapted Android fling and Chromium velocity
-algorithms retain their Apache-2.0 and BSD-3-Clause notices in
+Original code is available under either [MIT](LICENSE-MIT) or
+[Apache-2.0](LICENSE-APACHE), at your option (`MIT OR Apache-2.0`).
+The adapted Android fling and Chromium velocity algorithms retain their
+Apache-2.0 and BSD-3-Clause notices in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

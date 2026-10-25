@@ -1,5 +1,5 @@
 // Portions adapted from Android OverScroller. Copyright (C) 2010 The Android Open Source Project.
-// Licensed under Apache-2.0; see THIRD_PARTY_NOTICES.md and licenses/Apache-2.0.txt.
+// Licensed under Apache-2.0; see THIRD_PARTY_NOTICES.md and LICENSE-APACHE.
 //! Chrome SplineOverScroller 惯性滑行。
 //!
 //! 对标 Android `SplineOverScroller` (frameworks/base/core/java/android/widget/OverScroller.java)：

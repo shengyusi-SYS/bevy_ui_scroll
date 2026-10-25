@@ -1,8 +1,8 @@
 # Third-party notices
 
-Original code is licensed under MIT (see LICENSE). Adapted algorithms retain the notices below.
+Original code is available under either [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option. Adapted algorithms retain the notices below.
 
-原创代码采用 MIT，见 LICENSE。改编算法保留以下来源与许可声明。
+原创代码采用 `MIT OR Apache-2.0`，可选择 [MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE)。改编算法保留以下来源与许可声明。
 
 ## Android OverScroller
 
@@ -11,7 +11,7 @@ Original code is licensed under MIT (see LICENSE). Adapted algorithms retain the
 `src/fling.rs` 改编自 Android `OverScroller.java` 的惯性样条常量、时长与距离公式，以及查找表构造。
 
 Copyright (C) 2010 The Android Open Source Project.
-Licensed under the Apache License, Version 2.0. Full text: `licenses/Apache-2.0.txt`.
+Licensed under the Apache License, Version 2.0. Full text: [LICENSE-APACHE](LICENSE-APACHE).
 Source: <https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/widget/OverScroller.java>.
 Changes: Rust implementation, Bevy ECS integration, two-axis animation and boundary handling. This crate does not include Android platform code outside the adapted algorithms.
 
