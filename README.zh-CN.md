@@ -113,6 +113,10 @@ cargo run --example basic
 
 [示例](examples/basic.rs) 包含滚动面板、原生滚动条、吸附页面和刷新指示器。Home/End 定位面板，Escape 停止，Left/Right 切换页面。在顶部下拉可启动示例中的定时刷新。构建准备、测试和源码导航见[开发指南](docs/development.zh-CN.md)。
 
+## 生产实践
+
+[涟音 LianYin](https://lianyin.eztools.fun/zh-cn/) 是一款跨平台、跨设备音乐播放器，在实际产品中使用本库处理滚轮、触摸惯性和下拉刷新。产品介绍与版本发布见[涟音仓库](https://github.com/shengyusi-SYS/lianyin)。
+
 ## 许可证
 
 原创代码采用 `MIT OR Apache-2.0` 双许可证，你可以选择 [MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE)。改编的 Android 惯性与 Chromium 速度算法保留 Apache-2.0 和 BSD-3-Clause 声明，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

@@ -153,6 +153,10 @@ pages and a refresh indicator. Home/End move the panel, Escape stops it, and
 Left/Right select a page. Pull down at the top to start the demo's timed refresh.
 Build setup, tests and the source map are in the [developer guide](docs/development.md).
 
+## Production use
+
+[LianYin](https://lianyin.eztools.fun/en/) is a cross-platform, multi-device music player that uses this library in production for mouse wheel scrolling, touch inertia, and pull-to-refresh. See the [LianYin repository](https://github.com/shengyusi-SYS/lianyin) for product information and releases.
+
 ## License
 
 Original code is available under either [MIT](LICENSE-MIT) or
