@@ -1,0 +1,14 @@
+[package]
+name = "bevy_ui_scroll"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT AND Apache-2.0 AND BSD-3-Clause"
+description = "Composable scroll enhancement and pull-to-refresh for Bevy UI"
+readme = "README.md"
+repository = "https://github.com/shengyusi-SYS/bevy_ui_scroll"
+keywords = ["bevy", "ui", "scroll", "touch"]
+categories = ["gui", "game-development"]
+
+[dependencies]
+bevy = { version = "=0.19.1", default-features = false, features = ["ui", "bevy_ui_widgets"] }
