@@ -6,12 +6,12 @@
 
 ## 安装
 
-使用 Rust 1.95 或更新版本，以及 Bevy 0.19.1。
+使用 Rust 1.97.1 或更新版本，以及 Bevy 0.20.1。
 
 ```toml
 [dependencies]
-bevy = { version = "=0.19.1", default-features = false, features = ["ui", "bevy_ui_widgets"] }
-bevy_ui_scroll = { git = "https://github.com/shengyusi-SYS/bevy_ui_scroll.git", tag = "v0.1.0" }
+bevy = { version = "0.20.1", default-features = false, features = ["ui", "bevy_ui_widgets"] }
+bevy_ui_scroll = { git = "https://github.com/shengyusi-SYS/bevy_ui_scroll.git", branch = "main" }
 ```
 
 ## 创建滚动面板

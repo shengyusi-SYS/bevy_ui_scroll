@@ -142,7 +142,7 @@ impl PullToRefresh {
             }
             Pickable { should_block_lower: false, is_hoverable: false }
             ZIndex(2)
-            Children [(
+            Children [
                 #Body
                 Node {
                     height: px(32),
@@ -158,41 +158,37 @@ impl PullToRefresh {
                 BorderColor::all(Color::srgb(0.3, 0.3, 0.34))
                 Pickable { should_block_lower: false, is_hoverable: false }
                 Children [
-                    (
-                        #Arrow
-                        Node {
-                            width: px(8),
-                            height: px(8),
-                            margin: {UiRect::axes(px(5), px(0))},
-                            border: UiRect { top: px(0), right: px(2), bottom: px(2), left: px(0) },
-                        }
-                        UiTransform::from_rotation(Rot2::FRAC_PI_4)
-                        BorderColor::all(Color::srgb(0.8, 0.8, 0.84))
-                        Pickable { should_block_lower: false, is_hoverable: false }
-                    ),
-                    (
-                        #Progress
-                        Node {
-                            display: Display::None,
-                            width: px(18),
-                            height: px(18),
-                            border: UiRect { top: px(2), right: px(2), bottom: px(0), left: px(0) },
-                            border_radius: BorderRadius::MAX,
-                        }
-                        UiTransform
-                        IndicatorSpinnerSpeed
-                        BorderColor::all(Color::srgb(0.65, 0.72, 1.0))
-                        Pickable { should_block_lower: false, is_hoverable: false }
-                    ),
-                    (
-                        #Caption
-                        Text("")
-                        TextFont { font_size: px(12) }
-                        TextColor(Color::srgb(0.8, 0.8, 0.84))
-                        Pickable { should_block_lower: false, is_hoverable: false }
-                    ),
+                    #Arrow
+                    Node {
+                        width: px(8),
+                        height: px(8),
+                        margin: {UiRect::axes(px(5), px(0))},
+                        border: UiRect { top: px(0), right: px(2), bottom: px(2), left: px(0) },
+                    }
+                    UiTransform::from_rotation(Rot2::FRAC_PI_4)
+                    BorderColor::all(Color::srgb(0.8, 0.8, 0.84))
+                    Pickable { should_block_lower: false, is_hoverable: false }
+                    --
+                    #Progress
+                    Node {
+                        display: Display::None,
+                        width: px(18),
+                        height: px(18),
+                        border: UiRect { top: px(2), right: px(2), bottom: px(0), left: px(0) },
+                        border_radius: BorderRadius::MAX,
+                    }
+                    UiTransform
+                    IndicatorSpinnerSpeed
+                    BorderColor::all(Color::srgb(0.65, 0.72, 1.0))
+                    Pickable { should_block_lower: false, is_hoverable: false }
+                    --
+                    #Caption
+                    Text("")
+                    TextFont { font_size: px(12) }
+                    TextColor(Color::srgb(0.8, 0.8, 0.84))
+                    Pickable { should_block_lower: false, is_hoverable: false }
                 ]
-            )]
+            ]
         }
     }
 }
@@ -683,7 +679,7 @@ mod tests {
         use bevy::{
             camera::NormalizedRenderTarget,
             picking::{
-                events::{Pointer, Press},
+                events::{Pointer, PointerPress},
                 pointer::{Location, PointerButton},
             },
             window::WindowRef,
@@ -694,19 +690,19 @@ mod tests {
             .spawn((crate::ScrollGestureCapture, ChildOf(viewport)))
             .id();
         touch(&mut app, window, TouchPhase::Started, 0.0);
-        app.world_mut().trigger(Pointer::new(
-            PointerId::Touch(7),
-            Location {
-                target: NormalizedRenderTarget::Window(WindowRef::Entity(window).normalize(None).unwrap()),
-                position: Vec2::ZERO,
-            },
-            Press {
-                button: PointerButton::Primary,
-                hit: HitData::new(window, 0.0, None, None),
-                count: 1,
-            },
-            slider,
-        ));
+        app.world_mut().trigger(PointerPress {
+            pointer: Pointer::new(
+                PointerId::Touch(7),
+                Location {
+                    target: NormalizedRenderTarget::Window(WindowRef::Entity(window).normalize(None).unwrap()),
+                    position: Vec2::ZERO,
+                },
+            ),
+            entity: slider,
+            button: PointerButton::Primary,
+            hit: HitData::new(window, 0.0, None, None),
+            count: 1,
+        });
         touch(&mut app, window, TouchPhase::Moved, 400.0);
         touch(&mut app, window, TouchPhase::Ended, 400.0);
         assert_eq!(app.world().get::<ScrollPosition>(viewport).unwrap().y, 0.0);

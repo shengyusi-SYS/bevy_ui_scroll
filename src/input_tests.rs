@@ -57,28 +57,29 @@ fn pointer_wheel(app: &mut App, entity: Entity, unit: MouseScrollUnit, y: f32) {
         window::WindowRef,
     };
     let window = app.world_mut().spawn(Window::default()).id();
-    app.world_mut().trigger(Pointer::new(
-        PointerId::Mouse,
-        Location {
-            target: NormalizedRenderTarget::Window(WindowRef::Entity(window).normalize(None).unwrap()),
-            position: Vec2::ZERO,
-        },
-        bevy::picking::events::Scroll {
-            unit,
-            x: 0.0,
-            y,
-            hit: HitData::new(window, 0.0, None, None),
-            phase: bevy::input::touch::TouchPhase::Moved,
-        },
+    app.world_mut().trigger(bevy::picking::events::PointerScroll {
+        pointer: Pointer::new(
+            PointerId::Mouse,
+            Location {
+                target: NormalizedRenderTarget::Window(WindowRef::Entity(window).normalize(None).unwrap()),
+                position: Vec2::ZERO,
+            },
+        ),
         entity,
-    ));
+        unit,
+        x: 0.0,
+        y,
+        hit: HitData::new(window, 0.0, None, None),
+        phase: bevy::input::touch::TouchPhase::Moved,
+    });
     app.world_mut().flush();
 }
 
 #[test]
 fn native_and_enhanced_descendants_each_consume_the_pointer_wheel_once() {
     let mut app = App::new();
-    app.add_plugins((ScrollPlugin, bevy::ui_widgets::ScrollAreaPlugin));
+    app.init_resource::<bevy::input::mouse::MouseScrollPixelsPerLine>()
+        .add_plugins((ScrollPlugin, bevy::ui_widgets::ScrollAreaPlugin));
     let outer = viewport(&mut app);
     app.world_mut().entity_mut(outer).insert(EnhancedScroll);
     let native = viewport(&mut app);
@@ -237,6 +238,7 @@ fn reserved_scrollbar_extent_matches_native_range() {
     let mut app = running_app();
     app.init_resource::<bevy::ui::ui_surface::UiSurface>()
         .init_resource::<bevy::text::FontCx>()
+        .init_resource::<bevy::text::RemSize>()
         .add_systems(
             PostUpdate,
             bevy::ui::ui_layout_system.in_set(bevy::ui::UiSystems::Layout),
@@ -404,19 +406,19 @@ fn native_thumb_press_takes_over_motion_even_when_native_stops_bubbling() {
         behavior: ScrollBehavior::Smooth,
     });
     app.world_mut().flush();
-    app.world_mut().trigger(Pointer::new(
-        PointerId::Mouse,
-        Location {
-            target: NormalizedRenderTarget::Window(WindowRef::Entity(window).normalize(None).unwrap()),
-            position: Vec2::ZERO,
-        },
-        Press {
-            button: PointerButton::Primary,
-            hit: HitData::new(window, 0., None, None),
-            count: 1,
-        },
-        thumb,
-    ));
+    app.world_mut().trigger(PointerPress {
+        pointer: Pointer::new(
+            PointerId::Mouse,
+            Location {
+                target: NormalizedRenderTarget::Window(WindowRef::Entity(window).normalize(None).unwrap()),
+                position: Vec2::ZERO,
+            },
+        ),
+        entity: thumb,
+        button: PointerButton::Primary,
+        hit: HitData::new(window, 0., None, None),
+        count: 1,
+    });
     app.world_mut().flush();
     frame(&mut app, 300);
     assert_eq!(app.world().get::<ScrollPosition>(entity).unwrap().y, 0.);

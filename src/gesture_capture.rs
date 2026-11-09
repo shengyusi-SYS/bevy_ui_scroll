@@ -13,7 +13,7 @@ use bevy::{
     },
     input::touch::{TouchInput, TouchPhase},
     picking::{
-        events::{Cancel, DragEnd, Pointer, Press, Release},
+        events::{PointerCancel, PointerDragEnd, PointerPress, PointerRelease},
         pointer::PointerId,
     },
     prelude::Resource,
@@ -61,30 +61,27 @@ pub(crate) fn pointer_touch_id(pointer_id: PointerId) -> Option<u64> {
 }
 
 pub(super) fn capture_touch_press(
-    ev: On<Pointer<Press>>,
+    ev: On<PointerPress>,
     captures: Query<(), With<ScrollGestureCapture>>,
     mut state: ResMut<TouchGestureCaptureState>,
 ) {
     if captures.contains(ev.entity)
-        && let Some(touch_id) = pointer_touch_id(ev.pointer_id)
+        && let Some(touch_id) = pointer_touch_id(ev.pointer.id)
     {
         state.capture(touch_id, ev.entity);
     }
 }
 
-pub(super) fn release_touch_release(ev: On<Pointer<Release>>, mut pending: ResMut<PendingTouchGestureCaptureReleases>) {
-    queue_pointer_touch_release(ev.pointer_id, &mut pending);
+pub(super) fn release_touch_release(ev: On<PointerRelease>, mut pending: ResMut<PendingTouchGestureCaptureReleases>) {
+    queue_pointer_touch_release(ev.pointer.id, &mut pending);
 }
 
-pub(super) fn release_touch_drag_end(
-    ev: On<Pointer<DragEnd>>,
-    mut pending: ResMut<PendingTouchGestureCaptureReleases>,
-) {
-    queue_pointer_touch_release(ev.pointer_id, &mut pending);
+pub(super) fn release_touch_drag_end(ev: On<PointerDragEnd>, mut pending: ResMut<PendingTouchGestureCaptureReleases>) {
+    queue_pointer_touch_release(ev.pointer.id, &mut pending);
 }
 
-pub(super) fn release_touch_cancel(ev: On<Pointer<Cancel>>, mut pending: ResMut<PendingTouchGestureCaptureReleases>) {
-    queue_pointer_touch_release(ev.pointer_id, &mut pending);
+pub(super) fn release_touch_cancel(ev: On<PointerCancel>, mut pending: ResMut<PendingTouchGestureCaptureReleases>) {
+    queue_pointer_touch_release(ev.pointer.id, &mut pending);
 }
 
 pub(super) fn cleanup_removed_gesture_capture(

@@ -1,6 +1,6 @@
 use bevy::{
     input::{keyboard::KeyCode, mouse::MouseScrollUnit},
-    picking::events::{Pointer, Press, Scroll as PointerScroll},
+    picking::events::{PointerPress, PointerScroll},
     prelude::*,
     ui_widgets::{ScrollArea, Scrollbar, ScrollbarThumb},
 };
@@ -23,7 +23,7 @@ pub enum ScrollInputKind {
 }
 
 pub(crate) fn on_pointer_wheel(
-    mut event: On<Pointer<PointerScroll>>,
+    mut event: On<PointerScroll>,
     enhanced: Query<(), (With<EnhancedScroll>, Without<ScrollArea>)>,
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut commands: Commands,
@@ -51,7 +51,7 @@ pub(crate) fn on_pointer_wheel(
 }
 
 pub(crate) fn on_scrollbar_press(
-    event: On<Pointer<Press>>,
+    event: On<PointerPress>,
     bars: Query<&Scrollbar>,
     thumbs: Query<&ChildOf, With<ScrollbarThumb>>,
     mut commands: Commands,
