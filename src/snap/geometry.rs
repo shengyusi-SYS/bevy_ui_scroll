@@ -3,7 +3,7 @@
 use bevy::{
     ecs::{entity::Entity, query::With, system::Query},
     math::Vec2,
-    prelude::Children,
+    prelude::{ChildOf, Children},
     ui::{ComputedNode, ScrollPosition, UiGlobalTransform},
 };
 
@@ -60,7 +60,8 @@ pub(super) fn collect_snap_points(
     parent_gt: &UiGlobalTransform,
     parent_computed: &ComputedNode,
     children_q: &Query<&Children>,
-    snap_child_q: &Query<(&UiGlobalTransform, &ComputedNode), With<ScrollSnapPoint>>,
+    parent_q: &Query<&ChildOf>,
+    snap_child_q: &Query<(Entity, &UiGlobalTransform, &ComputedNode), With<ScrollSnapPoint>>,
     snap_container_q: &Query<(), With<ScrollSnap>>,
 ) -> Vec<f32> {
     collect_snap_targets(
@@ -69,6 +70,7 @@ pub(super) fn collect_snap_points(
         parent_gt,
         parent_computed,
         children_q,
+        parent_q,
         snap_child_q,
         snap_container_q,
     )
@@ -83,7 +85,8 @@ pub(super) fn collect_snap_targets(
     parent_gt: &UiGlobalTransform,
     parent_computed: &ComputedNode,
     children_q: &Query<&Children>,
-    snap_child_q: &Query<(&UiGlobalTransform, &ComputedNode), With<ScrollSnapPoint>>,
+    parent_q: &Query<&ChildOf>,
+    snap_child_q: &Query<(Entity, &UiGlobalTransform, &ComputedNode), With<ScrollSnapPoint>>,
     snap_container_q: &Query<(), With<ScrollSnap>>,
 ) -> Vec<(Entity, f32)> {
     let mut points = Vec::new();
@@ -102,19 +105,36 @@ pub(super) fn collect_snap_targets(
         ScrollSnapAxis::Y => parent_gt.translation.y - parent_computed.size().y * 0.5 + content_inset.min_inset.y,
     };
 
-    // 递归遍历所有后代，收集带 ScrollSnapPoint 的节点（Chrome SnapAreaList 语义）
-    // Reverse the stack push so visits follow Children declaration order.
-    let mut stack: Vec<&Entity> = Vec::new();
-    if let Ok(children) = children_q.get(parent_entity) {
-        stack.extend(children.iter().rev());
-    }
-    while let Some(entity) = stack.pop() {
-        // 嵌套 snap 容器：跳过整个子树（不入栈 children），
-        // 其内部 ScrollSnapPoint 归属于嵌套容器而非当前容器（Chrome SnapContainerData 语义）
-        if *entity != parent_entity && snap_container_q.contains(*entity) {
+    // Inspect sparse markers and their ancestor paths instead of walking every
+    // descendant of retained pages. Nested containers are barriers, including
+    // a marker attached to the nested container itself.
+    for (entity, child_gt, child_computed) in snap_child_q {
+        if entity == parent_entity || snap_container_q.contains(entity) {
             continue;
         }
-        if let Ok((child_gt, child_computed)) = snap_child_q.get(*entity) {
+        let mut path = Vec::new();
+        let mut child = entity;
+        let mut belongs = false;
+        for ancestor in parent_q.iter_ancestors::<ChildOf>(entity) {
+            let Some(index) = children_q
+                .get(ancestor)
+                .ok()
+                .and_then(|children| children.iter().position(|entity| *entity == child))
+            else {
+                break;
+            };
+            path.push(index);
+            if ancestor == parent_entity {
+                belongs = true;
+                break;
+            }
+            if snap_container_q.contains(ancestor) {
+                break;
+            }
+            child = ancestor;
+        }
+        if belongs {
+            path.reverse();
             let child_size = match snap_axis {
                 ScrollSnapAxis::X => child_computed.size().x,
                 ScrollSnapAxis::Y => child_computed.size().y,
@@ -128,16 +148,16 @@ pub(super) fn collect_snap_targets(
             // 转为逻辑像素
             let snap_point = (child_start - parent_content_start + layout_scroll) * isf;
             points.push((
-                *entity,
+                path,
+                entity,
                 snap_point.clamp(0.0, compute_max_scroll(snap_axis, parent_computed)),
             ));
         }
-        // 继续遍历该节点的子节点
-        if let Ok(grandchildren) = children_q.get(*entity) {
-            stack.extend(grandchildren.iter().rev());
-        }
     }
-    points
+    // Query order is storage order. Root-to-marker index paths preserve the
+    // previous depth-first Children declaration order, including marked parents.
+    points.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+    points.into_iter().map(|(_, entity, offset)| (entity, offset)).collect()
 }
 
 pub(super) fn nearest_snap_point(points: &[f32], current: f32) -> Option<f32> {
@@ -261,8 +281,157 @@ pub(super) fn point_in_node(point: Vec2, computed: &ComputedNode, global_transfo
 
 #[cfg(test)]
 mod tests {
+    use bevy::{ecs::system::SystemState, math::Affine2, prelude::*};
+
     use super::super::SNAP_SPRING_OMEGA;
     use super::*;
+
+    fn geometry(center: Vec2, size: Vec2, content: Vec2) -> (UiGlobalTransform, ComputedNode) {
+        (
+            UiGlobalTransform::from(Affine2::from_translation(center)),
+            ComputedNode {
+                size,
+                content_size: content,
+                inverse_scale_factor: 1.0,
+                ..default()
+            },
+        )
+    }
+
+    fn collected(world: &mut World, root: Entity, axis: ScrollSnapAxis) -> Vec<(Entity, f32)> {
+        let transform = *world.get::<UiGlobalTransform>(root).unwrap();
+        let computed = world.get::<ComputedNode>(root).unwrap().clone();
+        let mut state = SystemState::<(
+            Query<&Children>,
+            Query<&ChildOf>,
+            Query<(Entity, &UiGlobalTransform, &ComputedNode), With<ScrollSnapPoint>>,
+            Query<(), With<ScrollSnap>>,
+        )>::new(world);
+        let (children, parents, points, containers) = state.get(world).unwrap();
+        collect_snap_targets(
+            axis,
+            root,
+            &transform,
+            &computed,
+            &children,
+            &parents,
+            &points,
+            &containers,
+        )
+    }
+
+    // T1: real hierarchy/geometry queries. Declaration order differs from
+    // entity creation and spatial order, including a marked ancestor.
+    #[test]
+    fn collected_targets_follow_depth_first_declaration_order() {
+        let mut world = World::new();
+        let root = world
+            .spawn(geometry(Vec2::ZERO, Vec2::splat(100.0), Vec2::splat(1000.0)))
+            .id();
+        let peer = world
+            .spawn((ScrollSnapPoint, geometry(Vec2::ZERO, Vec2::splat(20.0), Vec2::ZERO)))
+            .id();
+        let descendant = world
+            .spawn((
+                ScrollSnapPoint,
+                geometry(Vec2::splat(100.0), Vec2::splat(20.0), Vec2::ZERO),
+            ))
+            .id();
+        let ancestor = world
+            .spawn((
+                ScrollSnapPoint,
+                geometry(Vec2::splat(200.0), Vec2::splat(20.0), Vec2::ZERO),
+            ))
+            .id();
+        world.entity_mut(ancestor).add_child(descendant);
+        world.entity_mut(root).add_children(&[ancestor, peer]);
+        assert_eq!(
+            collected(&mut world, root, ScrollSnapAxis::X)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>(),
+            vec![ancestor, descendant, peer]
+        );
+    }
+
+    #[test]
+    fn collected_targets_belong_to_the_nearest_snap_container() {
+        let mut world = World::new();
+        let root = world
+            .spawn((
+                ScrollSnap {
+                    axis: ScrollSnapAxis::X,
+                },
+                ScrollSnapPoint,
+                geometry(Vec2::ZERO, Vec2::splat(100.0), Vec2::splat(1000.0)),
+            ))
+            .id();
+        let outer = world
+            .spawn((ScrollSnapPoint, geometry(Vec2::ZERO, Vec2::splat(20.0), Vec2::ZERO)))
+            .id();
+        let nested = world
+            .spawn((
+                ScrollSnap {
+                    axis: ScrollSnapAxis::X,
+                },
+                ScrollSnapPoint,
+                geometry(Vec2::ZERO, Vec2::splat(100.0), Vec2::splat(1000.0)),
+            ))
+            .id();
+        let inner = world
+            .spawn((ScrollSnapPoint, geometry(Vec2::ZERO, Vec2::splat(20.0), Vec2::ZERO)))
+            .id();
+        world.spawn((ScrollSnapPoint, geometry(Vec2::ZERO, Vec2::splat(20.0), Vec2::ZERO)));
+        world.entity_mut(root).add_children(&[outer, nested]);
+        world.entity_mut(nested).add_child(inner);
+        assert_eq!(
+            collected(&mut world, root, ScrollSnapAxis::X)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>(),
+            vec![outer]
+        );
+        assert_eq!(
+            collected(&mut world, nested, ScrollSnapAxis::X)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>(),
+            vec![inner]
+        );
+    }
+
+    #[test]
+    fn collected_offsets_preserve_scale_insets_scroll_and_native_limits() {
+        let mut world = World::new();
+        let (transform, mut computed) = geometry(Vec2::new(200.0, 300.0), Vec2::splat(100.0), Vec2::splat(500.0));
+        computed.inverse_scale_factor = 0.5;
+        computed.scroll_position = Vec2::new(40.0, 60.0);
+        computed.border.min_inset = Vec2::new(4.0, 6.0);
+        computed.padding.min_inset = Vec2::splat(6.0);
+        let root = world.spawn((transform, computed)).id();
+        let before = world
+            .spawn((ScrollSnapPoint, geometry(Vec2::ZERO, Vec2::splat(20.0), Vec2::ZERO)))
+            .id();
+        let middle = world
+            .spawn((
+                ScrollSnapPoint,
+                geometry(Vec2::new(230.0, 310.0), Vec2::splat(20.0), Vec2::ZERO),
+            ))
+            .id();
+        let after = world
+            .spawn((
+                ScrollSnapPoint,
+                geometry(Vec2::splat(1000.0), Vec2::splat(20.0), Vec2::ZERO),
+            ))
+            .id();
+        world.entity_mut(root).add_children(&[before, middle, after]);
+        for (axis, offset) in [(ScrollSnapAxis::X, 50.0), (ScrollSnapAxis::Y, 49.0)] {
+            assert_eq!(
+                collected(&mut world, root, axis),
+                vec![(before, 0.0), (middle, offset), (after, 200.0)]
+            );
+        }
+    }
 
     // ══════════════════════════════════════════════
     // SpringAnim（对应 Chrome snap_fling_curve_unittest.cc）

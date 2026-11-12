@@ -236,12 +236,20 @@ fn line_wheel_settles_at_large_offsets() {
 #[test]
 fn reserved_scrollbar_extent_matches_native_range() {
     let mut app = running_app();
-    app.init_resource::<bevy::ui::ui_surface::UiSurface>()
+    app.init_resource::<bevy::ui::UiRoots>()
         .init_resource::<bevy::text::FontCx>()
         .init_resource::<bevy::text::RemSize>()
         .add_systems(
             PostUpdate,
-            bevy::ui::ui_layout_system.in_set(bevy::ui::UiSystems::Layout),
+            (
+                bevy::ui::update_ui_roots,
+                bevy::ui::sync_taffy_styles_with_nodes,
+                bevy::ui::mark_dirty_ui_trees,
+                bevy::ui::ui_layout_system,
+                bevy::ui::update_computed_nodes,
+            )
+                .chain()
+                .in_set(bevy::ui::UiSystems::Layout),
         );
     let entity = app
         .world_mut()

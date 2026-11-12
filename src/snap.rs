@@ -150,7 +150,7 @@ pub(super) fn scroll_snap_touch_tracker(
         &UiGlobalTransform,
     )>,
     children_q: Query<&Children>,
-    snap_child_q: Query<(&UiGlobalTransform, &ComputedNode), bevy::ecs::query::With<ScrollSnapPoint>>,
+    snap_child_q: Query<(Entity, &UiGlobalTransform, &ComputedNode), bevy::ecs::query::With<ScrollSnapPoint>>,
     snap_container_q: Query<(), bevy::ecs::query::With<ScrollSnap>>,
     parent_q: Query<&ChildOf>,
     time: Res<Time>,
@@ -282,6 +282,7 @@ pub(super) fn scroll_snap_touch_tracker(
                             global_transform,
                             computed,
                             &children_q,
+                            &parent_q,
                             &snap_child_q,
                             &snap_container_q,
                         );
@@ -307,6 +308,7 @@ pub(super) fn scroll_snap_touch_tracker(
                         global_transform,
                         computed,
                         &children_q,
+                        &parent_q,
                         &snap_child_q,
                         &snap_container_q,
                     );
@@ -350,6 +352,7 @@ pub(super) fn scroll_snap_touch_tracker(
                         global_transform,
                         computed,
                         &children_q,
+                        &parent_q,
                         &snap_child_q,
                         &snap_container_q,
                     );
@@ -389,7 +392,8 @@ pub(super) fn scroll_snap_system(
         &UiGlobalTransform,
     )>,
     children_q: Query<&Children>,
-    snap_child_q: Query<(&UiGlobalTransform, &ComputedNode), bevy::ecs::query::With<ScrollSnapPoint>>,
+    parent_q: Query<&ChildOf>,
+    snap_child_q: Query<(Entity, &UiGlobalTransform, &ComputedNode), bevy::ecs::query::With<ScrollSnapPoint>>,
     snap_container_q: Query<(), bevy::ecs::query::With<ScrollSnap>>,
     time: Res<Time>,
     mut redraw: MessageWriter<RequestRedraw>,
@@ -435,6 +439,7 @@ pub(super) fn scroll_snap_system(
                 global_transform,
                 computed,
                 &children_q,
+                &parent_q,
                 &snap_child_q,
                 &snap_container_q,
             );
@@ -491,6 +496,7 @@ pub(super) fn scroll_snap_system(
                     global_transform,
                     computed,
                     &children_q,
+                    &parent_q,
                     &snap_child_q,
                     &snap_container_q,
                 );
@@ -505,6 +511,7 @@ pub(super) fn scroll_snap_system(
                     global_transform,
                     computed,
                     &children_q,
+                    &parent_q,
                     &snap_child_q,
                     &snap_container_q,
                 );
@@ -528,6 +535,7 @@ pub(super) fn scroll_snap_system(
                     global_transform,
                     computed,
                     &children_q,
+                    &parent_q,
                     &snap_child_q,
                     &snap_container_q,
                 );
@@ -554,6 +562,7 @@ pub(super) fn scroll_snap_system(
             global_transform,
             computed,
             &children_q,
+            &parent_q,
             &snap_child_q,
             &snap_container_q,
         );
@@ -610,7 +619,8 @@ pub(crate) fn resolve_snap_requests(
         &PendingSnapRequest,
     )>,
     children: Query<&Children>,
-    points: Query<(&UiGlobalTransform, &ComputedNode), bevy::prelude::With<ScrollSnapPoint>>,
+    parents: Query<&ChildOf>,
+    points: Query<(Entity, &UiGlobalTransform, &ComputedNode), bevy::prelude::With<ScrollSnapPoint>>,
     nested: Query<(), bevy::prelude::With<ScrollSnap>>,
     mut commands: bevy::prelude::Commands,
 ) {
@@ -619,7 +629,16 @@ pub(crate) fn resolve_snap_requests(
         if computed.size().min_element() <= 0.0 {
             continue;
         }
-        let targets = collect_snap_targets(config.axis, entity, transform, computed, &children, &points, &nested);
+        let targets = collect_snap_targets(
+            config.axis,
+            entity,
+            transform,
+            computed,
+            &children,
+            &parents,
+            &points,
+            &nested,
+        );
         let target = match request.target {
             SnapTarget::Entity(entity) => targets.iter().find(|(point, _)| *point == entity),
             SnapTarget::Index(index) => targets.get(index),
@@ -670,12 +689,22 @@ pub(crate) fn observe_snap_status(
         &mut ScrollSnapStatus,
     )>,
     children: Query<&Children>,
-    points: Query<(&UiGlobalTransform, &ComputedNode), bevy::prelude::With<ScrollSnapPoint>>,
+    parents: Query<&ChildOf>,
+    points: Query<(Entity, &UiGlobalTransform, &ComputedNode), bevy::prelude::With<ScrollSnapPoint>>,
     nested: Query<(), bevy::prelude::With<ScrollSnap>>,
 ) {
     use bevy::prelude::DetectChangesMut;
     for (entity, config, state, position, computed, transform, mut status) in &mut containers {
-        let targets = collect_snap_targets(config.axis, entity, transform, computed, &children, &points, &nested);
+        let targets = collect_snap_targets(
+            config.axis,
+            entity,
+            transform,
+            computed,
+            &children,
+            &parents,
+            &points,
+            &nested,
+        );
         let actual = match config.axis {
             ScrollSnapAxis::X => computed.scroll_position.x,
             ScrollSnapAxis::Y => computed.scroll_position.y,
