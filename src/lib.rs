@@ -137,7 +137,7 @@ mod tests {
                 target,
                 total_distance: Vec2::ZERO,
                 duration: Vec2::ZERO,
-                elapsed: 0.0,
+                started_at: std::time::Duration::ZERO,
                 prev_position_fraction: Vec2::ZERO,
             });
         let other = app.world_mut().spawn_empty().id();
@@ -148,7 +148,7 @@ mod tests {
                 target: other,
                 total_distance: Vec2::ZERO,
                 duration: Vec2::ZERO,
-                elapsed: 0.0,
+                started_at: std::time::Duration::ZERO,
                 prev_position_fraction: Vec2::ZERO,
             });
 

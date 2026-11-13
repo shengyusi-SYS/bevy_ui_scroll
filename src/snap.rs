@@ -116,6 +116,8 @@ pub(crate) struct ScrollSnapState {
     wheel_scrolling: bool,
     /// D5: 绑定的触摸 ID（只响应起始于容器区域内的触摸）
     active_touch: Option<u64>,
+    /// A release starts motion now, not at the start of its containing frame.
+    touch_released_at: std::time::Duration,
     /// §9: 本帧累积的滚轮 delta（由 apply_snap_delta 记录，scroll_snap_system 消费）
     pub(super) wheel_delta: f32,
 }
@@ -133,6 +135,7 @@ impl Default for ScrollSnapState {
             wheel_last_time: 0.0,
             wheel_scrolling: false,
             active_touch: None,
+            touch_released_at: std::time::Duration::ZERO,
             wheel_delta: 0.0,
         }
     }
@@ -157,13 +160,9 @@ pub(super) fn scroll_snap_touch_tracker(
     touch_scroll_state: Res<TouchScrollState>,
     captures: Res<TouchGestureCaptureState>,
 ) {
-    let base_time = time.elapsed_secs();
-    let mut event_idx = 0u32;
+    let now = time.elapsed_secs();
 
     for touch in touch_events.read() {
-        let now = base_time + event_idx as f32 * 0.0001;
-        event_idx += 1;
-
         // Started 深度排他 pre-pass：只让最内层 snap 容器响应触摸开始
         let deepest_started = if touch.phase == TouchPhase::Started && !touch_is_captured(&captures, touch.id) {
             let mut best: Option<(Entity, u32)> = None;
@@ -242,6 +241,7 @@ pub(super) fn scroll_snap_touch_tracker(
                     }
                     state.touching = false;
                     state.active_touch = None;
+                    state.touch_released_at = time.elapsed();
 
                     // Scroll Session: tap（未超过 TOUCH_SLOP）或方向锁定与 snap 轴不匹配 → 跳过 snap 动画
                     if let Some(lock) = touch_scroll_state.direction_lock(touch.id) {
@@ -341,6 +341,7 @@ pub(super) fn scroll_snap_touch_tracker(
                     }
                     state.touching = false;
                     state.active_touch = None;
+                    state.touch_released_at = time.elapsed();
                     state.velocity = 0.0;
                     state.prev_pos = current;
 
@@ -416,6 +417,10 @@ pub(super) fn scroll_snap_system(
             state.prev_pos = current;
             continue;
         }
+        let dt = time
+            .delta()
+            .min(time.elapsed().saturating_sub(state.touch_released_at))
+            .as_secs_f32();
 
         // ── Chrome 模型：wheel 自由滚动 → idle 检测 → snap ──
         let now = time.elapsed_secs();

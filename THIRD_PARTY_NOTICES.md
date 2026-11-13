@@ -24,4 +24,5 @@ Changes: Rust implementation, Bevy ECS integration, two-axis animation and bound
 Copyright 2014 The Chromium Authors.
 BSD-style license: `licenses/Chromium-BSD.txt` (upstream repository license includes Copyright 2015 The Chromium Authors).
 Source: <https://chromium.googlesource.com/chromium/src/+/24d53e3e9a861c76d0e1626522c93e371f5d9223/ui/events/velocity_tracker/velocity_tracker.cc>.
-Changes: bounded Rust sample storage, normal-equation fit and Bevy vector integration.
+Changes: bounded Rust sample storage, normal-equation fit, Bevy vector integration and same-timestamp latest-position coalescing. The coalescing policy follows Android VelocityTracker behavior rather than the pinned Chromium implementation:
+<https://android.googlesource.com/platform/frameworks/native/+/refs/heads/main/libs/input/VelocityTracker.cpp>.

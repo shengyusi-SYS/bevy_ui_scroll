@@ -42,6 +42,14 @@ pub(super) struct FlingVelocitySampler {
 
 impl FlingVelocitySampler {
     pub(super) fn add(&mut self, time: f32, pos: Vec2) {
+        // One frame may deliver several positions with the same timestamp.
+        // Keep its latest position without weighting that instant repeatedly.
+        if let Some(last) = self.samples.last_mut()
+            && last.time == time
+        {
+            last.pos = pos;
+            return;
+        }
         self.samples.push(FlingTimeSample { time, pos });
         if self.samples.len() > FLING_SAMPLE_CAP {
             self.samples.remove(0);
@@ -182,6 +190,12 @@ impl SingleAxisVelocitySampler {
     }
 
     pub(super) fn add_sample(&mut self, time: f32, position: f32) {
+        if let Some(last) = self.samples.last_mut()
+            && last.time == time
+        {
+            last.position = position;
+            return;
+        }
         self.samples.push(SingleAxisSample { time, position });
         if self.samples.len() > SNAP_VELOCITY_SAMPLE_CAP {
             self.samples.remove(0);
@@ -255,6 +269,27 @@ impl SingleAxisVelocitySampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn velocity_samplers_same_timestamp_updates_do_not_bias_velocity() {
+        let mut fling = FlingVelocitySampler::default();
+        let mut axis = SingleAxisVelocitySampler::default();
+        for (time, position) in [(0.0, 0.0), (0.025, 25.0), (0.05, 40.0), (0.05, 50.0)] {
+            fling.add(time, Vec2::new(position, -position));
+            axis.add_sample(time, position);
+        }
+        // Three distinct instants describe a straight 1000 px/s trajectory;
+        // intermediate positions at the final instant must not weight the fit.
+        assert!((fling.velocity(0.05) - Vec2::new(1000.0, -1000.0)).length() < 1.0);
+        assert!((axis.compute_velocity(0.05) - 1000.0).abs() < 1.0);
+        // A batch at one instant must not evict earlier, distinct samples.
+        for _ in 0..30 {
+            fling.add(0.05, Vec2::new(50.0, -50.0));
+            axis.add_sample(0.05, 50.0);
+        }
+        assert!((fling.velocity(0.05) - Vec2::new(1000.0, -1000.0)).length() < 1.0);
+        assert!((axis.compute_velocity(0.05) - 1000.0).abs() < 1.0);
+    }
 
     /// 零样本返回零速度
     #[test]

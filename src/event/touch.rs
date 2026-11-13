@@ -262,7 +262,7 @@ pub(crate) fn send_scroll_events(
                             target,
                             total_distance: Vec2::new(dist_x, dist_y),
                             duration: Vec2::new(dur_x, dur_y),
-                            elapsed: 0.0,
+                            started_at: time.elapsed(),
                             prev_position_fraction: Vec2::ZERO,
                         });
                     } else {

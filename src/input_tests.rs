@@ -123,6 +123,137 @@ fn frame(app: &mut App, millis: u64) {
     app.update();
 }
 
+// Real ScrollPlugin input -> scroll delivery -> fling ordering. Only the
+// platform hit-test and clock are supplied; pure sampler tests cannot cover
+// final Moved delivery and newly created motion in the same frame.
+#[test]
+fn touch_release_keeps_last_move_and_starts_fling_next_frame() {
+    use bevy::{
+        input::touch::{TouchInput, TouchPhase},
+        math::Affine2,
+        picking::{backend::HitData, hover::HoverMap, pointer::PointerId},
+    };
+    for snap in [true, false] {
+        let mut app = running_app();
+        let entity = viewport(&mut app);
+        app.world_mut().entity_mut(entity).insert((
+            EnhancedScroll,
+            UiGlobalTransform::from(Affine2::from_translation(Vec2::splat(50.0))),
+        ));
+        if snap {
+            app.world_mut().entity_mut(entity).insert(ScrollSnap {
+                axis: ScrollSnapAxis::Y,
+            });
+            app.world_mut().spawn((
+                Node::default(),
+                ScrollSnapPoint,
+                ComputedNode {
+                    size: Vec2::splat(20.0),
+                    ..default()
+                },
+                UiGlobalTransform::from(Affine2::from_translation(Vec2::new(50.0, 250.0))),
+                ChildOf(entity),
+            ));
+        }
+        app.world_mut()
+            .resource_mut::<HoverMap>()
+            .entry(PointerId::Touch(41))
+            .or_default()
+            .insert(entity, HitData::new(Entity::PLACEHOLDER, 0.0, None, None));
+        let send = |app: &mut App, phase, y| {
+            app.world_mut().write_message(TouchInput {
+                phase,
+                position: Vec2::new(50.0, y),
+                window: Entity::PLACEHOLDER,
+                force: None,
+                id: 41,
+            });
+        };
+        send(&mut app, TouchPhase::Started, 80.0);
+        frame(&mut app, 0);
+        send(&mut app, TouchPhase::Moved, 55.0);
+        frame(&mut app, 25);
+        send(&mut app, TouchPhase::Moved, 30.0);
+        send(&mut app, TouchPhase::Ended, 30.0);
+        frame(&mut app, 25);
+        let released = app.world().get::<ScrollPosition>(entity).unwrap().y;
+        assert!((released - 50.0).abs() < 0.001, "snap={snap}: released at {released}");
+        app.world_mut()
+            .resource_mut::<Messages<bevy::window::RequestRedraw>>()
+            .clear();
+        frame(&mut app, 10);
+        assert!(app.world().get::<ScrollPosition>(entity).unwrap().y > released);
+        assert!(
+            !app.world()
+                .resource::<Messages<bevy::window::RequestRedraw>>()
+                .is_empty(),
+            "snap={snap}: active motion must request its next frame"
+        );
+    }
+}
+
+#[test]
+fn intermediate_touch_samples_in_one_frame_do_not_change_motion() {
+    use bevy::{
+        input::touch::{TouchInput, TouchPhase},
+        math::Affine2,
+        picking::{backend::HitData, hover::HoverMap, pointer::PointerId},
+    };
+    for snap in [true, false] {
+        let trajectory = |intermediate| {
+            let mut app = running_app();
+            let entity = viewport(&mut app);
+            app.world_mut().entity_mut(entity).insert((
+                EnhancedScroll,
+                UiGlobalTransform::from(Affine2::from_translation(Vec2::splat(50.0))),
+            ));
+            if snap {
+                app.world_mut().entity_mut(entity).insert(ScrollSnap {
+                    axis: ScrollSnapAxis::Y,
+                });
+            }
+            app.world_mut()
+                .resource_mut::<HoverMap>()
+                .entry(PointerId::Touch(41))
+                .or_default()
+                .insert(entity, HitData::new(Entity::PLACEHOLDER, 0.0, None, None));
+            let send = |app: &mut App, phase, y| {
+                app.world_mut().write_message(TouchInput {
+                    phase,
+                    position: Vec2::new(50.0, y),
+                    window: Entity::PLACEHOLDER,
+                    force: None,
+                    id: 41,
+                });
+            };
+            send(&mut app, TouchPhase::Started, 80.0);
+            frame(&mut app, 0);
+            send(&mut app, TouchPhase::Moved, 55.0);
+            frame(&mut app, 25);
+            if intermediate {
+                send(&mut app, TouchPhase::Moved, 40.0);
+            }
+            send(&mut app, TouchPhase::Moved, 30.0);
+            send(&mut app, TouchPhase::Ended, 30.0);
+            frame(&mut app, 25);
+            let mut positions = vec![app.world().get::<ScrollPosition>(entity).unwrap().y];
+            for millis in [10, 17, 30] {
+                frame(&mut app, millis);
+                positions.push(app.world().get::<ScrollPosition>(entity).unwrap().y);
+            }
+            positions
+        };
+        let direct = trajectory(false);
+        let batched = trajectory(true);
+        for (expected, actual) in direct.iter().zip(&batched) {
+            assert!(
+                (expected - actual).abs() < 0.01,
+                "snap={snap}: {direct:?} vs {batched:?}"
+            );
+        }
+    }
+}
+
 #[test]
 fn touch_fling_completes_at_the_same_endpoint_across_frame_steps() {
     use bevy::{

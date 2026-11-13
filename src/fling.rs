@@ -155,8 +155,8 @@ pub(super) struct FlingEntry {
     pub(super) total_distance: Vec2,
     /// 各轴 fling 总时长 (秒)
     pub(super) duration: Vec2,
-    /// 已经过时间 (秒)
-    pub(super) elapsed: f32,
+    /// 创建时刻；释放前的当前帧 delta 不属于这段惯性。
+    pub(super) started_at: std::time::Duration,
     /// 上一帧的各轴位置分数（0~1）
     pub(super) prev_position_fraction: Vec2,
 }
@@ -192,16 +192,16 @@ pub(super) fn touch_fling_system(
         if snap_q.contains(entry.target) {
             return false;
         }
-        entry.elapsed += dt;
+        let elapsed = time.elapsed().saturating_sub(entry.started_at).as_secs_f32();
 
         // 各轴的 time_fraction 和 position_fraction（独立时长）
         let tf_x = if entry.duration.x > 0.0 {
-            (entry.elapsed / entry.duration.x).min(1.0)
+            (elapsed / entry.duration.x).min(1.0)
         } else {
             1.0
         };
         let tf_y = if entry.duration.y > 0.0 {
-            (entry.elapsed / entry.duration.y).min(1.0)
+            (elapsed / entry.duration.y).min(1.0)
         } else {
             1.0
         };
@@ -281,7 +281,7 @@ pub(super) fn touch_fling_system(
 
             bevy::log::trace!(
                 "[fling] Frame: elapsed={:.3}s delta={delta:?} target={target:?} (spline)",
-                entry.elapsed
+                elapsed
             );
         } else {
             return false;
