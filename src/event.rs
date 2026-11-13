@@ -25,7 +25,7 @@ use super::snap::{ScrollSnap, ScrollSnapAxis, ScrollSnapState};
 pub use delta::SmoothScroll;
 pub(crate) use delta::SmoothScrollState;
 pub(super) use delta::{apply_snap_delta, smooth_scroll_system};
-pub(super) use touch::{TouchScrollState, send_scroll_events};
+pub(super) use touch::{TouchScrollState, send_scroll_events, take_over_touch_motion};
 
 use delta::apply_normal_or_smooth_delta;
 

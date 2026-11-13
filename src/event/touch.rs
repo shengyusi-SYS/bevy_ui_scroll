@@ -76,6 +76,42 @@ impl TouchScrollState {
 
 // ── send_scroll_events 系统 ──
 
+// Take over existing motion after hit testing, before pointer-event observers can
+// issue navigation from a same-frame tap. Doing this in Update would cancel the
+// new request made by that tap in PreUpdate.
+pub(crate) fn take_over_touch_motion(
+    mut touches: MessageReader<TouchInput>,
+    hover_map: Res<HoverMap>,
+    node_q: Query<(&Node, Has<crate::EnhancedScroll>, Has<bevy::ui_widgets::ScrollArea>)>,
+    parent_q: Query<&ChildOf>,
+    mut commands: Commands,
+) {
+    for touch in touches.read().filter(|touch| touch.phase == TouchPhase::Started) {
+        let pending = pending_targets_for_touch(&hover_map, touch.id);
+        // Pressing a viewport takes over old motion before crossing slop.
+        let mut owners = std::collections::HashSet::new();
+        for &hit in &pending {
+            for entity in std::iter::once(hit).chain(parent_q.iter_ancestors::<ChildOf>(hit)) {
+                if let Ok((_, enhanced, native)) = node_q.get(entity) {
+                    if native {
+                        break;
+                    }
+                    if enhanced {
+                        owners.insert(entity);
+                    }
+                }
+            }
+        }
+        for entity in owners {
+            commands.trigger(crate::StopScroll { entity });
+            commands.trigger(crate::ScrollInput {
+                entity,
+                kind: crate::ScrollInputKind::Touch,
+            });
+        }
+    }
+}
+
 /// 注入鼠标滚轮和触屏滚动事件到 UI 层级。
 pub(crate) fn send_scroll_events(
     mut touch_events: MessageReader<TouchInput>,
@@ -100,27 +136,6 @@ pub(crate) fn send_scroll_events(
         match touch.phase {
             TouchPhase::Started => {
                 let pending = pending_targets_for_touch(&hover_map, touch.id);
-                // Pressing a viewport takes over old motion before crossing slop.
-                let mut owners = std::collections::HashSet::new();
-                for &hit in &pending {
-                    for entity in std::iter::once(hit).chain(parent_q.iter_ancestors::<ChildOf>(hit)) {
-                        if let Ok((_, enhanced, native)) = node_q.get(entity) {
-                            if native {
-                                break;
-                            }
-                            if enhanced {
-                                owners.insert(entity);
-                            }
-                        }
-                    }
-                }
-                for entity in owners {
-                    commands.trigger(crate::StopScroll { entity });
-                    commands.trigger(crate::ScrollInput {
-                        entity,
-                        kind: crate::ScrollInputKind::Touch,
-                    });
-                }
                 // §3: 取消与当前触摸区域重叠的 fling
                 fling_state
                     .entries

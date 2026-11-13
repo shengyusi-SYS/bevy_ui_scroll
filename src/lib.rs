@@ -67,6 +67,12 @@ impl Plugin for ScrollPlugin {
             .init_resource::<fling::FlingState>()
             .init_resource::<overscroll::OverscrollBounceState>()
             .add_systems(
+                bevy::prelude::PreUpdate,
+                event::take_over_touch_motion
+                    .after(bevy::picking::hover::generate_hovermap)
+                    .before(bevy::picking::events::pointer_events),
+            )
+            .add_systems(
                 Update,
                 (ApplyDeferred, gesture_capture::cleanup_removed_gesture_capture)
                     .chain()

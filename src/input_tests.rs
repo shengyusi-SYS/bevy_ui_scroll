@@ -622,3 +622,91 @@ fn cancelled_overscroll_settles_once_at_the_nonzero_snap_point() {
         "expected the actual first point at 100, got {last}"
     );
 }
+
+#[test]
+fn same_frame_touch_activation_preserves_new_programmatic_navigation() {
+    use bevy::{
+        input::touch::{TouchInput, TouchPhase},
+        math::Affine2,
+        picking::{backend::HitData, hover::HoverMap, pointer::PointerId},
+    };
+    let mut settled = Vec::new();
+    for snap in [false, true] {
+        let mut app = running_app();
+        let entity = viewport(&mut app);
+        app.world_mut().entity_mut(entity).insert((
+            EnhancedScroll,
+            UiGlobalTransform::from(Affine2::from_translation(Vec2::splat(50.))),
+        ));
+        let point = app
+            .world_mut()
+            .spawn((
+                Node::default(),
+                ScrollSnapPoint,
+                ComputedNode {
+                    size: Vec2::splat(100.),
+                    ..default()
+                },
+                UiGlobalTransform::from(Affine2::from_translation(Vec2::new(50., 250.))),
+                ChildOf(entity),
+            ))
+            .id();
+        if snap {
+            app.world_mut().entity_mut(entity).insert(ScrollSnap {
+                axis: ScrollSnapAxis::Y,
+            });
+            app.world_mut().spawn((
+                Node::default(),
+                ScrollSnapPoint,
+                ComputedNode {
+                    size: Vec2::splat(100.),
+                    ..default()
+                },
+                UiGlobalTransform::from(Affine2::from_translation(Vec2::splat(50.))),
+                ChildOf(entity),
+            ));
+        }
+        app.world_mut()
+            .resource_mut::<HoverMap>()
+            .entry(PointerId::Touch(41))
+            .or_default()
+            .insert(entity, HitData::new(Entity::PLACEHOLDER, 0., None, None));
+        // This is the UI activation boundary: picking has dispatched a Click
+        // from the raw touch batch, then the consumer requests navigation.
+        app.add_systems(
+            PreUpdate,
+            (move |mut touches: MessageReader<TouchInput>, mut commands: Commands| {
+                if touches.read().any(|touch| touch.phase == TouchPhase::Ended) {
+                    if snap {
+                        commands.trigger(ScrollToSnap {
+                            entity,
+                            target: SnapTarget::Entity(point),
+                            instant: false,
+                        });
+                    } else {
+                        commands.trigger(ScrollToOffset {
+                            entity,
+                            offset: Vec2::new(0., 200.),
+                            behavior: ScrollBehavior::Smooth,
+                        });
+                    }
+                }
+            })
+            .after(bevy::picking::events::pointer_events),
+        );
+        for phase in [TouchPhase::Started, TouchPhase::Ended] {
+            app.world_mut().write_message(TouchInput {
+                phase,
+                position: Vec2::splat(50.),
+                window: Entity::PLACEHOLDER,
+                force: None,
+                id: 41,
+            });
+        }
+        for _ in 0..90 {
+            frame(&mut app, 16);
+        }
+        settled.push(app.world().get::<ScrollPosition>(entity).unwrap().y);
+    }
+    assert_eq!(settled, [200., 200.]);
+}
